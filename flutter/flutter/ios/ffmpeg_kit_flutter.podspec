@@ -15,10 +15,17 @@ Pod::Spec.new do |s|
   s.source_files        = 'Classes/**/*'
   s.public_header_files = 'Classes/**/*.h'
 
-  s.default_subspec     = 'https'
+  s.default_subspec     = 'custom'
 
   s.dependency          'Flutter'
   s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES', 'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386' }
+
+  s.subspec 'custom' do |ss|
+    ss.source_files         = 'Classes/**/*'
+    ss.public_header_files  = 'Classes/**/*.h'
+    ss.dependency 'ffmpeg_kit_flutter_custom', '6.0.3'
+    ss.ios.deployment_target = '12.1'
+  end
 
   s.subspec 'min' do |ss|
     ss.source_files         = 'Classes/**/*'
