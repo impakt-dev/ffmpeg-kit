@@ -33,6 +33,8 @@ DISPLAY_HELP=""
 BUILD_FULL=""
 BUILD_TYPE_ID=""
 BUILD_VERSION=$(git describe --tags --always 2>>"${BASEDIR}"/build.log)
+# Skips the ffmpeg build and only creates the archive
+ARCHIVE_ONLY=""
 
 # PROCESS LTS BUILD OPTION FIRST AND SET BUILD TYPE: MAIN OR LTS
 rm -f "${BASEDIR}"/android/ffmpeg-kit-android-lib/build.gradle 1>>"${BASEDIR}"/build.log 2>&1
@@ -138,6 +140,9 @@ while [ ! $# -eq 0 ]; do
   --no-ffmpeg-kit-protocols)
     export NO_FFMPEG_KIT_PROTOCOLS="1"
     ;;
+  --archive-only)
+    ARCHIVE_ONLY="1"
+    ;;
   *)
     print_unknown_option "$1"
     ;;
@@ -202,48 +207,41 @@ for gpl_library in {$LIBRARY_X264,$LIBRARY_XVIDCORE,$LIBRARY_X265,$LIBRARY_LIBVI
     fi
   fi
 done
+if [[ -z ${ARCHIVE_ONLY} ]]; then
+  echo -n -e "\nDownloading sources: "
+  echo -e "INFO: Downloading the source code of ffmpeg and external libraries.\n" 1>>"${BASEDIR}"/build.log 2>&1
 
-echo -n -e "\nDownloading sources: "
-echo -e "INFO: Downloading the source code of ffmpeg and external libraries.\n" 1>>"${BASEDIR}"/build.log 2>&1
+  download_gnu_config
+  downloaded_library_sources "${ENABLED_LIBRARIES[@]}"
 
-# DOWNLOAD GNU CONFIG
-download_gnu_config
+  export ORIGINAL_API=${API}
 
-# DOWNLOAD LIBRARY SOURCES
-downloaded_library_sources "${ENABLED_LIBRARIES[@]}"
+  for run_arch in {0..12}; do
+    if [[ ${ENABLED_ARCHITECTURES[$run_arch]} -eq 1 ]]; then
+      if [[ (${run_arch} -eq ${ARCH_ARM64_V8A} || ${run_arch} -eq ${ARCH_X86_64}) && ${ORIGINAL_API} -lt 21 ]]; then
+        export API=21
+      else
+        export API=${ORIGINAL_API}
+      fi
 
-# SAVE ORIGINAL API LEVEL = NECESSARY TO BUILD 64bit ARCHITECTURES
-export ORIGINAL_API=${API}
+      export ARCH=$(get_arch_name $run_arch)
+      export TOOLCHAIN=$(get_toolchain)
+      export TOOLCHAIN_ARCH=$(get_toolchain_arch)
 
-# BUILD ENABLED LIBRARIES ON ENABLED ARCHITECTURES
-for run_arch in {0..12}; do
-  if [[ ${ENABLED_ARCHITECTURES[$run_arch]} -eq 1 ]]; then
-    if [[ (${run_arch} -eq ${ARCH_ARM64_V8A} || ${run_arch} -eq ${ARCH_X86_64}) && ${ORIGINAL_API} -lt 21 ]]; then
+      . "${BASEDIR}"/scripts/main-android.sh "${ENABLED_LIBRARIES[@]}" || exit 1
 
-      # 64 bit ABIs supported after API 21
-      export API=21
-    else
-      export API=${ORIGINAL_API}
+      for library in {0..61}; do
+        library_name=$(get_library_name ${library})
+        unset "$(echo "OK_${library_name}" | sed "s/\-/\_/g")"
+        unset "$(echo "DEPENDENCY_REBUILT_${library_name}" | sed "s/\-/\_/g")"
+      done
     fi
+  done
 
-    export ARCH=$(get_arch_name $run_arch)
-    export TOOLCHAIN=$(get_toolchain)
-    export TOOLCHAIN_ARCH=$(get_toolchain_arch)
-
-    # EXECUTE MAIN BUILD SCRIPT
-    . "${BASEDIR}"/scripts/main-android.sh "${ENABLED_LIBRARIES[@]}" || exit 1
-
-    # CLEAR FLAGS
-    for library in {0..61}; do
-      library_name=$(get_library_name ${library})
-      unset "$(echo "OK_${library_name}" | sed "s/\-/\_/g")"
-      unset "$(echo "DEPENDENCY_REBUILT_${library_name}" | sed "s/\-/\_/g")"
-    done
-  fi
-done
-
-# GET BACK THE ORIGINAL API LEVEL
-export API=${ORIGINAL_API}
+  export API=${ORIGINAL_API}
+else
+  echo -e "\nINFO: --archive-only set — skipping source download and external library builds.\n" 1>>"${BASEDIR}"/build.log 2>&1
+fi
 
 # SET ARCHITECTURES TO BUILD
 rm -f "${BASEDIR}"/android/build/.armv7 1>>"${BASEDIR}"/build.log 2>&1
