@@ -246,3 +246,47 @@ See our [CONTRIBUTING](CONTRIBUTING.md) guide.
 - [FFmpeg API Documentation](https://ffmpeg.org/doxygen/4.0/index.html)
 - [FFmpeg Wiki](https://trac.ffmpeg.org/wiki/WikiStart)
 - [FFmpeg External Library Licenses](https://www.ffmpeg.org/doxygen/4.0/md_LICENSE.html)
+
+## Building for Impakt
+
+If building for [Impakt](https://impakt.com) project, use the following commands
+
+
+### Android
+
+Make sure `ANDROID_SDK_ROOT` and `ANDROID_NDK_ROOT` environment variables are set. You should use NDK r28 or higher (only tested up to r28)
+
+You must use `--enable-android-media-codec` and `--enable-android-zlib` options to build for Impakt.
+
+```bash
+bash android.sh --enable-android-media-codec --enable-android-zlib
+```
+
+You can optionally disable the following architectures since Impakt only supports arm64-v8a. This will make the build faster, but may not affect final size, since AAB should strip per architecture.
+
+```bash
+bash android.sh --enable-android-media-codec \
+  --enable-android-zlib \
+  --disable-arm-v7a \
+  --disable-arm-v7a-neon \
+  --disable-x86 \
+  --disable-x86-64
+```
+
+You can skip the ffmpeg build and only build the ffmpeg-kit.aar file by using the `--archive-only` option. Useful if you just want to test changes in the ffmpeg-kit code.
+
+You should then upload the AAR file to https://github.com/impakt-dev/ffmpeg-kit/releases and update the URL for `ffmpegAarUrl` in the `build.gradle` file to the GitHub release URL.
+
+### iOS
+
+**Unverified at the moment, must be tested!! Check Android instructions above for reference**
+
+```bash
+bash ios.sh --enable-ios-videotoolbox  --enable-ios-zlib	
+```
+
+This will build a framework in the `prebuilt` folder. Similarly to android, it needs to be uploaded to Github releases. If the version changes, it should be reflected in `flutter/flutter/ios/ffmpeg_kit_flutter_custom.podspec`.
+
+---
+
+You can then test locally by changing the flutter project's pubspec.yaml to point to your local ffmpeg-kit repo. If all works well, you can commit and push the changes.
